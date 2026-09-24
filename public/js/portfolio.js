@@ -3,6 +3,11 @@ import { formatKrw, getUsdKrwRate } from './currency.js';
 let usdKrwRate = null;
 let cashAssetTotal = 0;
 let stockDailyChangeKrw = 0;
+const DEMO_CURRENT_PRICES = {
+    AAPL: 195.25,
+    NVDA: 132.40,
+    '005930.KS': 78300
+};
 
 const formatUsd = (amount) => `$${Number(amount).toLocaleString(undefined, {
     minimumFractionDigits: 2,
@@ -229,24 +234,35 @@ const loadPortfolio = async () => {
         }
         const dbData = await response.json();
         const enrichedData = dbData.map(async (item) => {
-            let currentPrice = Number(item.avg_price);
-            let priceData = { currency: 'USD' };
+            const averagePrice = Number(item.avg_price);
+            const quantity = Number(item.quantity);
+            let currentPrice = DEMO_CURRENT_PRICES[item.ticker] || averagePrice;
+            let priceData = {
+                currency: item.ticker.endsWith('.KS') || item.ticker.endsWith('.KQ') ? 'KRW' : 'USD',
+                name: item.ticker
+            };
 
             try {
                 const priceResponse = await fetch(`/api/price/${item.ticker}`);
                 if (priceResponse.ok) {
-                    priceData = await priceResponse.json();
-                    currentPrice = priceData.currentPrice;
+                    const remotePriceData = await priceResponse.json();
+                    if (Number.isFinite(Number(remotePriceData.currentPrice))) {
+                        currentPrice = Number(remotePriceData.currentPrice);
+                    }
+                    priceData = { ...priceData, ...remotePriceData };
                 }
             } catch (error) {
                 console.error(`${item.ticker} 주가 연동 실패`, error);
             }
 
+            if (!Number.isFinite(currentPrice)) {
+                currentPrice = averagePrice;
+            }
             const currency = priceData && priceData.currency === 'KRW' ? 'KRW' : 'USD';
-            const investAmount = Number(item.avg_price) * item.quantity;
+            const investAmount = averagePrice * quantity;
             const previousClose = Number(priceData.previousClose);
             const dailyChange = Number.isFinite(previousClose) ? currentPrice - previousClose : 0;
-            const evalAmount = currentPrice * item.quantity;
+            const evalAmount = currentPrice * quantity;
             const safeRate = Number.isFinite(usdKrwRate) ? usdKrwRate : 1;
             const investAmountKrw = currency === 'KRW' ? investAmount : investAmount * safeRate;
             const evalAmountKrw = currency === 'KRW' ? evalAmount : evalAmount * safeRate;

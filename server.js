@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const session = require('express-session');
 const path = require('path');
+const pool = require('./db');
 const { initDatabase } = require('./db');
 const { isLoggedIn } = require('./middleware/auth');
 
@@ -42,6 +43,28 @@ app.use(session({
         maxAge: 1000 * 60 * 60 * 24 * 7
     }
 }));
+app.get('/demo', async (req, res, next) => {
+    if (process.env.DEMO_DATA_MODE !== 'true') {
+        res.status(404).send('데모 화면이 비활성화되어 있습니다.');
+        return;
+    }
+    let conn;
+    try {
+        conn = await pool.getConnection();
+        const rows = await conn.query('SELECT id, username FROM users WHERE username = ?', ['demo']);
+        if (rows.length === 0) {
+            res.status(503).send('데모 데이터가 준비되지 않았습니다.');
+            return;
+        }
+        req.session.demoUser = { id: rows[0].id, username: rows[0].username };
+        delete req.session.user;
+        res.redirect('/');
+    } catch (error) {
+        next(error);
+    } finally {
+        if (conn) conn.release();
+    }
+});
 app.get('/', isLoggedIn, (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });

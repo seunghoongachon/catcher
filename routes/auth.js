@@ -42,6 +42,7 @@ router.post('/login', async (req, res) => {
             res.status(401).json({ error: '아이디 또는 비밀번호가 올바르지 않습니다.' });
             return;
         }
+        delete req.session.demoUser;
         req.session.user = { id: user.id, username: user.username };
         res.json({ user: req.session.user });
     } catch (error) {
@@ -65,7 +66,7 @@ router.post('/logout', (req, res) => {
 });
 
 router.get('/me', (req, res) => {
-    res.json({ user: req.session.user || null });
+    res.json({ user: req.session.user || req.session.demoUser || null });
 });
 
 module.exports = router;

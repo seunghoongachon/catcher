@@ -1,4 +1,5 @@
 const mariadb = require('mariadb');
+const bcrypt = require('bcrypt');
 
 const CONNECTION_TIMEOUT = 10000;
 
@@ -237,6 +238,71 @@ const ensureUserColumnsAndForeignKeys = async (conn) => {
     }
 };
 
+const seedDemoData = async (conn) => {
+    if (process.env.DEMO_DATA_MODE !== 'true') {
+        return;
+    }
+
+    const existingDemoUsers = await conn.query(
+        'SELECT id FROM users WHERE username = ? LIMIT 1',
+        ['demo']
+    );
+    if (existingDemoUsers.length > 0) {
+        console.log('DEMO_DATA_MODE=true: 기존 데모 데이터 유지');
+        return;
+    }
+
+    const demoPassword = await bcrypt.hash('DemoOnlyPassword123!', 12);
+    await conn.beginTransaction();
+    try {
+        for (const [tableName] of scopedTables.slice().reverse()) {
+            await conn.query(`DELETE FROM \`${tableName}\``);
+        }
+        await conn.query('DELETE FROM users');
+        const userResult = await conn.query(
+            'INSERT INTO users (username, password) VALUES (?, ?)',
+            ['demo', demoPassword]
+        );
+        const demoUserId = userResult.insertId;
+
+        await conn.query(
+            `INSERT INTO portfolio (user_id, ticker, avg_price, quantity)
+             VALUES (?, 'AAPL', 182.50, 12), (?, 'NVDA', 875.00, 5), (?, '005930.KS', 73500, 20)`,
+            [demoUserId, demoUserId, demoUserId]
+        );
+        await conn.query(
+            `INSERT INTO sell_history (user_id, ticker, sell_price, sell_quantity, sell_date)
+             VALUES (?, 'AAPL', 195.20, 3, '2026-09-01'), (?, 'NVDA', 920.00, 2, '2026-09-10')`,
+            [demoUserId, demoUserId]
+        );
+        await conn.query(
+            `INSERT INTO bank_accounts
+                (user_id, account_name, account_type, balance, original_balance, currency, interest_rate, compounding_type)
+             VALUES (?, '데모 증권 계좌', 'SECURITIES', 3500000, 3500000, 'KRW', 2.5, 'MONTHLY')`,
+            [demoUserId]
+        );
+        await conn.query(
+            `INSERT INTO buy_presets (user_id, preset_name, ticker, buy_entries)
+             VALUES (?, '데모 분할매수', 'AAPL', ?)`,
+            [demoUserId, JSON.stringify([
+                { date: '2026-09-01', price: 180, quantity: 5 },
+                { date: '2026-09-15', price: 185, quantity: 5 }
+            ])]
+        );
+        await conn.query(
+            `INSERT INTO compound_presets
+                (user_id, preset_name, account_id, interest_rate, compounding_type, years, payments)
+             VALUES (?, '데모 월복리', NULL, 3.5, 'MONTHLY', 10, ?)`,
+            [demoUserId, JSON.stringify([{ month: 12, amount: 500000 }])]
+        );
+        await conn.commit();
+        console.warn('DEMO_DATA_MODE=true: 기존 사용자·자산 데이터를 데모 데이터로 교체했습니다.');
+    } catch (error) {
+        await conn.rollback();
+        throw error;
+    }
+};
+
 const initDatabase = async () => {
     let conn;
 
@@ -249,6 +315,7 @@ const initDatabase = async () => {
             console.log(`데이터베이스 테이블 확인 완료: ${table.name}`);
         }
         await ensureUserColumnsAndForeignKeys(conn);
+        await seedDemoData(conn);
     } catch (error) {
         console.error('데이터베이스 초기화 실패:', error);
         throw error;

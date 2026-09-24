@@ -1,17 +1,40 @@
 const mariadb = require('mariadb');
 
-// Aiven의 DATABASE_URL은 'mysql://'로 시작하므로 mariadb 드라이버가 읽을 수 있게 'mariadb://'로 교체
-let dbConfig = process.env.DATABASE_URL;
-if (dbConfig && dbConfig.startsWith('mysql://')) {
-    dbConfig = dbConfig.replace('mysql://', 'mariadb://');
-}
+const CONNECTION_TIMEOUT = 10000;
+
+const buildDatabaseUrl = (databaseUrl) => {
+    if (!databaseUrl) {
+        return null;
+    }
+
+    let parsedUrl;
+    try {
+        parsedUrl = new URL(databaseUrl);
+    } catch (error) {
+        throw new Error('DATABASE_URL이 올바른 MySQL/MariaDB 연결 URL이 아닙니다.', { cause: error });
+    }
+
+    if (!['mysql:', 'mariadb:'].includes(parsedUrl.protocol)) {
+        throw new Error('DATABASE_URL은 mysql:// 또는 mariadb:// 형식이어야 합니다.');
+    }
+
+    parsedUrl.protocol = 'mariadb:';
+    parsedUrl.searchParams.set('sslMode', 'REQUIRED');
+    parsedUrl.searchParams.set('connectTimeout', String(CONNECTION_TIMEOUT));
+    parsedUrl.searchParams.set('allowPublicKeyRetrieval', 'true');
+    return parsedUrl.toString();
+};
+
+const dbConfig = buildDatabaseUrl(process.env.DATABASE_URL);
 
 const pool = mariadb.createPool(dbConfig || {
     host: process.env.DB_HOST || 'localhost',
     user: process.env.DB_USER || 'root',
     password: process.env.DB_PASSWORD || 'qwer',
     database: process.env.DB_NAME || 'stock_tracker',
-    connectionLimit: Number(process.env.DB_CONNECTION_LIMIT) || 5
+    connectionLimit: Number(process.env.DB_CONNECTION_LIMIT) || 5,
+    connectTimeout: CONNECTION_TIMEOUT,
+    allowPublicKeyRetrieval: true
 });
 
 const tableDefinitions = [

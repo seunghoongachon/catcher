@@ -107,6 +107,8 @@
                     <span id="loggedInUser" class="font-semibold text-gray-600"></span>
                     <a id="loginLink" href="/login.html"
                         class="hidden px-3 py-2 rounded-md text-indigo-600 hover:bg-indigo-50 font-semibold">로그인</a>
+                    <a id="registerLink" href="/register.html"
+                        class="hidden px-3 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 font-semibold">회원가입</a>
                     <button id="logoutButton" type="button"
                         class="px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 font-semibold">로그아웃</button>
                 </div>
@@ -489,6 +491,17 @@
         import './js/compound.js';
         import './js/patch-notes.js';
 
+        const originalFetch = window.fetch.bind(window);
+        window.fetch = async (...args) => {
+            const response = await originalFetch(...args);
+            if (response.status === 403) {
+                alert('데모 화면에서는 저장할 수 없습니다.\n로그인하거나 회원가입 후 이용해 주세요.');
+            } else if (response.status === 401) {
+                alert('로그인이 필요한 기능입니다.');
+            }
+            return response;
+        };
+
         const currentUserResponse = await fetch('/api/auth/me');
         const currentUserData = await currentUserResponse.json();
         document.getElementById('loggedInUser').textContent = currentUserData.user
@@ -496,6 +509,7 @@
             : '';
         const isDemoMode = currentUserData.user && currentUserData.user.username === 'demo';
         document.getElementById('loginLink').classList.toggle('hidden', !isDemoMode);
+        document.getElementById('registerLink').classList.toggle('hidden', !isDemoMode);
         document.getElementById('logoutButton').classList.toggle('hidden', isDemoMode);
         document.getElementById('logoutButton').addEventListener('click', async () => {
             await fetch('/api/auth/logout', { method: 'POST' });

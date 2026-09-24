@@ -4,18 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CATCHER 로그인</title>
+    <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body>
-    <main>
-        <h1>CATCHER 로그인</h1>
-        <form id="loginForm">
-            <input name="username" placeholder="아이디" required>
-            <input name="password" type="password" placeholder="비밀번호" required>
-            <button type="submit">로그인</button>
-        </form>
-        <p id="message"></p>
-        <a href="/register.html">회원가입</a>
-        <a href="/demo">데모 화면 보기</a>
+<body class="min-h-screen bg-[#f5f6f8] text-slate-900">
+    <main class="min-h-screen flex items-center justify-center px-5 py-10">
+        <section class="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 shadow-[0_18px_60px_rgba(15,23,42,0.08)]">
+            <div class="mb-8">
+                <p class="mb-2 text-sm font-bold tracking-[0.18em] text-indigo-600">CATCHER</p>
+                <h1 class="text-3xl font-black tracking-tight">다시 만나서 반가워요</h1>
+                <p class="mt-2 text-sm text-slate-500">내 투자 기록을 안전하게 이어서 관리하세요.</p>
+            </div>
+            <form id="loginForm" class="space-y-4">
+                <label class="block text-sm font-semibold text-slate-700">아이디
+                    <input name="username" autocomplete="username" required
+                        class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100"
+                        placeholder="아이디를 입력하세요">
+                </label>
+                <label class="block text-sm font-semibold text-slate-700">비밀번호
+                    <input name="password" type="password" autocomplete="current-password" required
+                        class="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100"
+                        placeholder="비밀번호를 입력하세요">
+                </label>
+                <button class="w-full rounded-xl bg-indigo-600 py-3.5 font-bold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700">
+                    로그인
+                </button>
+            </form>
+            <p id="message" class="mt-4 min-h-5 text-center text-sm font-semibold text-rose-500"></p>
+            <div class="mt-6 flex items-center justify-between border-t border-slate-100 pt-5 text-sm">
+                <a href="/register.html" class="font-semibold text-indigo-600 hover:underline">회원가입</a>
+                <a href="/demo" class="font-semibold text-slate-500 hover:text-slate-800">데모 먼저 둘러보기</a>
+            </div>
+        </section>
     </main>
     <script src="/js/auth.js"></script>
 </body>

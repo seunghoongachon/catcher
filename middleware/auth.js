@@ -17,8 +17,12 @@ const isLoggedIn = (req, res, next) => {
         return;
     }
 
-    if (req.path.startsWith('/api/')) {
+    if (req.originalUrl.startsWith('/api/')) {
         res.status(401).json({ error: '로그인이 필요합니다.' });
+        return;
+    }
+    if (process.env.DEMO_DATA_MODE === 'true' && req.method === 'GET') {
+        res.redirect('/demo');
         return;
     }
     res.redirect('/login.html');

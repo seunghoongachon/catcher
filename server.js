@@ -2,6 +2,7 @@ require('dotenv').config();
 
 const express = require('express');
 const path = require('path');
+const { initDatabase } = require('./db');
 
 const priceRoutes = require('./routes/price');
 const sellHistoryRoutes = require('./routes/sell-history');
@@ -31,6 +32,14 @@ app.use('/api/compound-presets', compoundPresetRoutes);
 app.use('/api/parse-trade-screenshot', parseTradeScreenshotRoutes);
 app.use('/api/buy-presets', buyPresetRoutes);
 
-app.listen(PORT, () => {
-    console.log(`서버 실행: http://localhost:${PORT}`);
+const startServer = async () => {
+    await initDatabase();
+    app.listen(PORT, () => {
+        console.log(`서버 실행: http://localhost:${PORT}`);
+    });
+};
+
+startServer().catch((error) => {
+    console.error('서버 시작 실패:', error);
+    process.exitCode = 1;
 });

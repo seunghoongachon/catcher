@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CATCHER</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0"></script>
+    <style>
+        :root {
+            color-scheme: light;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .dashboard-card {
+            border: 1px solid #eef0f3;
+            border-radius: 24px;
+            box-shadow: 0 8px 30px rgba(15, 23, 42, 0.05);
+        }
+        .asset-card {
+            position: relative;
+            overflow: hidden;
+            border-radius: 20px;
+            transition: transform 160ms ease, box-shadow 160ms ease;
+        }
+        .asset-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
+        }
+        .asset-card::after {
+            content: '';
+            position: absolute;
+            width: 90px;
+            height: 90px;
+            right: -28px;
+            bottom: -35px;
+            border-radius: 999px;
+            background: rgba(99, 102, 241, 0.04);
+        }
+        .toss-input {
+            border-radius: 12px;
+            border-color: #e5e7eb;
+            background: #f8fafc;
+        }
+        .toss-input:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.12);
+            background: #fff;
+        }
+        .portfolio-table {
+            border: 1px solid #eef0f3;
+            border-radius: 16px;
+            overflow: hidden;
+        }
+        .portfolio-table thead tr {
+            background: #f8fafc;
+        }
+        .portfolio-table th {
+            color: #6b7280;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+        }
+        .portfolio-table tbody tr.portfolio-group td {
+            padding: 12px 16px;
+            font-size: 12px;
+            letter-spacing: -0.02em;
+        }
+        .portfolio-table tbody tr.portfolio-group-domestic {
+            border-left: 3px solid #f59e0b;
+            background: #fffbeb;
+            color: #92400e;
+        }
+        .portfolio-table tbody tr.portfolio-group-overseas {
+            border-left: 3px solid #38bdf8;
+            background: #f0f9ff;
+            color: #075985;
+        }
+        .portfolio-table tbody tr.portfolio-subtotal {
+            background: #fff;
+            border-top: 1px solid #e5e7eb;
+            color: #4b5563;
+        }
+        .portfolio-table tbody tr.portfolio-subtotal td {
+            padding: 12px 16px;
+        }
+        .portfolio-table tbody tr.portfolio-total {
+            background: #f5f7ff;
+            border-top: 2px solid #c7d2fe;
+            color: #3730a3;
+        }
+        .portfolio-table tbody tr.portfolio-total td {
+            padding: 15px 16px;
+        }
+        .portfolio-table tbody tr.portfolio-stock-row:hover {
+            background: #fafafa;
+        }
+    </style>
+</head>
+<body class="bg-[#f5f6f8] min-h-screen font-sans text-gray-900">
+    <nav class="sticky top-0 z-10 bg-white/95 backdrop-blur border-b border-gray-100">
+        <div class="max-w-7xl mx-auto px-6">
+            <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-4">
+                <h1 class="text-xl font-extrabold text-gray-900">🐱 CATCHER</h1>
+                <div class="no-scrollbar flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="주요 기능">
+                    <button id="portfolioTab" role="tab" aria-controls="portfolioSection" aria-selected="true"
+                        class="tab-button whitespace-nowrap px-4 py-2 rounded-md bg-indigo-600 text-white font-semibold transition"
+                        onclick="switchTab('portfolio')">포트폴리오</button>
+                    <button id="trackerTab" role="tab" aria-controls="trackerSection" aria-selected="false"
+                        class="tab-button whitespace-nowrap px-4 py-2 rounded-md text-gray-600 hover:bg-gray-100 font-semibold transition"
+                        onclick="switchTab('tracker')">거래 타임라인</button>
+                    <button id="simulationTab" role="tab" aria-controls="simulationSection" aria-selected="false"
+                        class="tab-button whitespace-nowrap px-4 py-2 rounded-md text-gray-600 hover:bg-gray-100 font-semibold transition"
+                        onclick="switchTab('simulation')">매수 시뮬레이션</button>
+                    <button id="opportunityTab" role="tab" aria-controls="opportunitySection" aria-selected="false"
+                        class="tab-button whitespace-nowrap px-4 py-2 rounded-md text-gray-600 hover:bg-gray-100 font-semibold transition"
+                        onclick="switchTab('opportunity')">매도 기회비용</button>
+                    <button id="compoundTab" role="tab" aria-controls="compoundSection" aria-selected="false"
+                        class="tab-button whitespace-nowrap px-4 py-2 rounded-md text-gray-600 hover:bg-gray-100 font-semibold transition"
+                        onclick="switchTab('compound')">복리계산기</button>
+                    <button id="patchNotesTab" role="tab" aria-controls="patchNotesSection" aria-selected="false"
+                        class="tab-button whitespace-nowrap px-4 py-2 rounded-md text-gray-600 hover:bg-gray-100 font-semibold transition"
+                        onclick="switchTab('patchNotes')">패치노트</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <main class="max-w-7xl mx-auto px-4 py-6 sm:px-6 sm:py-8">
+        <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_18rem] gap-6 items-start">
+        <div>
+        <section id="portfolioSection" role="tabpanel" aria-labelledby="portfolioTab">
+            <div class="dashboard-card bg-white p-5 sm:p-8">
+                <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
+                    <div>
+                        <p class="text-sm font-semibold text-indigo-600 mb-2">CATCHER 자산 대시보드</p>
+                        <h2 class="text-2xl sm:text-3xl font-extrabold tracking-tight text-gray-950">내 자산 한눈에 보기</h2>
+                        <p class="mt-2 text-sm text-gray-500">주식과 현금자산을 한 곳에서 관리하세요.</p>
+                    </div>
+                    <div class="flex gap-1.5 rounded-xl bg-gray-100 p-1 text-sm">
+                        <button id="stockViewBtn" type="button" onclick="switchPortfolioView('stock')" class="px-3 py-2 rounded-lg bg-indigo-600 text-white font-semibold shadow-sm">주식</button>
+                        <button id="cashViewBtn" type="button" onclick="switchPortfolioView('cash')" class="px-3 py-2 rounded-lg text-gray-600 font-semibold">현금자산</button>
+                        <button id="totalViewBtn" type="button" onclick="switchPortfolioView('total')" class="px-3 py-2 rounded-lg text-gray-600 font-semibold">총합</button>
+                    </div>
+                </div>
+                <div id="assetSummary" class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-8">
+                    <button type="button" onclick="switchPortfolioView('stock')" class="asset-card text-left border border-indigo-100 bg-white p-5">
+                        <p class="text-sm font-semibold text-indigo-600">주식 평가금액</p>
+                        <p id="stockAssetTotal" class="mt-2 text-2xl font-extrabold tracking-tight text-gray-950">계산 중...</p>
+                        <p id="stockAssetChange" class="mt-2 text-xs text-gray-500">전일대비 계산 중...</p>
+                        <p id="stockAssetUsd" class="mt-1 text-xs text-gray-500">USD 계산 중... · 상세 보기 →</p>
+                    </button>
+                    <button type="button" onclick="switchPortfolioView('cash')" class="asset-card text-left border border-emerald-100 bg-emerald-50 p-5">
+                        <p class="text-sm font-semibold text-emerald-700">현금자산</p>
+                        <p id="cashAssetTotal" class="mt-2 text-2xl font-extrabold tracking-tight text-emerald-950">조회 중...</p>
+                        <p class="mt-2 text-xs text-emerald-700">현금·예수금 관리하기 →</p>
+                    </button>
+                    <button type="button" onclick="switchPortfolioView('total')" class="asset-card text-left border border-violet-100 bg-violet-50 p-5">
+                        <p class="text-sm font-semibold text-violet-700">총 통합 자산</p>
+                        <p id="combinedAssetTotal" class="mt-2 text-2xl font-extrabold tracking-tight text-violet-950">계산 중...</p>
+                        <p id="combinedAssetChange" class="mt-2 text-xs text-violet-700">전일대비 계산 중...</p>
+                        <p class="mt-1 text-xs text-violet-700">전체 자산 보기 →</p>
+                    </button>
+                </div>
+                <div id="stockViewPanel">
+                <div id="stockManagement" class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+                    <div>
+                        <label for="portMarket" class="block text-xs font-semibold text-gray-700 mb-1">시장</label>
+                        <select id="portMarket" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+                            <option value="US">미국 주식 (USD)</option>
+                            <option value="KR">국내 주식 (KRW)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label for="portTicker" id="portTickerLabel" class="block text-xs font-semibold text-gray-700 mb-1">티커</label>
+                        <input type="text" id="portTicker" placeholder="AAPL" class="w-full px-3 py-2 border border-gray-300 rounded-md uppercase text-sm">
+                        <input type="text" id="portKoreanSearch" placeholder="국내 종목명 검색 (예: 삼성전자)" class="hidden w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+                        <div id="stockSearchResults" class="relative z-20"></div>
+                    </div>
+                    <div>
+                        <label for="portPrice" id="portPriceLabel" class="block text-xs font-semibold text-gray-700 mb-1">평단가 ($)</label>
+                        <input type="number" id="portPrice" placeholder="150.50" step="0.01" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-gray-700 mb-1">보유 수량</label>
+                        <input type="number" id="portQty" placeholder="10" class="w-full px-3 py-2 border border-gray-300 rounded-md text-sm">
+                    </div>
+                </div>
+                <button id="savePortBtn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-md transition-colors mb-6 text-sm">주식 저장/업데이트</button>
+                <div class="flex justify-between items-center mb-3">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900">현재 보유 주식</h3>
+                        <p class="mt-1 text-xs text-gray-500">국내·해외 주식의 평가금액과 수익률을 확인하세요.</p>
+                    </div>
+                    <button id="loadPortBtn" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 px-3 rounded-lg transition">새로고침</button>
+                </div>
+                <div class="flex justify-end gap-1.5 mb-2">
+                    <button id="sortEvalBtn" class="text-[11px] px-2 py-1 bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50 rounded shadow-sm transition">평가금순 ↓</button>
+                    <button id="sortInvestBtn" class="text-[11px] px-2 py-1 bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50 rounded shadow-sm transition">투자금순 ↓</button>
+                    <button id="sortQtyBtn" class="text-[11px] px-2 py-1 bg-white border border-gray-300 text-gray-600 hover:bg-indigo-50 rounded shadow-sm transition">수량순 ↓</button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="portfolio-table w-full text-left border-collapse">
+                        <thead><tr class="bg-gray-100 text-gray-700 text-xs">
+                            <th class="p-2 border-b">종목</th><th class="p-2 border-b text-right">수량</th>
+                            <th class="p-2 border-b text-right">투자금</th><th class="p-2 border-b text-right">평가금액</th><th class="p-2 border-b text-right">전일대비</th>
+                        </tr></thead>
+                        <tbody id="portfolioBody" class="text-xs">
+                            <tr><td colspan="5" class="p-4 text-center text-gray-500">포트폴리오를 불러와주세요.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                </div>
+                <div id="cashViewPanel" class="hidden mt-6 border-t border-gray-200 pt-6">
+                    <h3 class="text-xl font-extrabold text-gray-900 mb-5">🏦 현금자산</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+                        <div><label class="block text-xs font-semibold text-gray-700 mb-1">계좌 종류</label>
+                            <select id="accType" class="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="GENERAL">일반 입출금</option><option value="CMA">CMA</option><option value="SAVINGS">예적금</option><option value="SECURITIES">증권 예수금</option></select></div>
+                        <div><label class="block text-xs font-semibold text-gray-700 mb-1">계좌명</label><input type="text" id="accName" placeholder="토스파킹통장" class="w-full px-3 py-2 border border-gray-300 rounded-md"></div>
+                        <div><label for="accCurrency" class="block text-xs font-semibold text-gray-700 mb-1">입력 통화</label>
+                            <select id="accCurrency" class="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="KRW">원화 (₩)</option><option value="USD">달러 ($)</option></select></div>
+                        <div><label id="accBalanceLabel" class="block text-xs font-semibold text-gray-700 mb-1">잔고 (원)</label><input type="number" id="accBalance" placeholder="5000000" step="0.01" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md"></div>
+                        <div><label class="block text-xs font-semibold text-gray-700 mb-1">연이율 (%)</label><input type="number" id="accRate" placeholder="3.5" step="0.1" min="0" class="w-full px-3 py-2 border border-gray-300 rounded-md"></div>
+                        <div><label for="accCompounding" class="block text-xs font-semibold text-gray-700 mb-1">복리 방식</label>
+                            <select id="accCompounding" class="w-full px-3 py-2 border border-gray-300 rounded-md"><option value="MONTHLY">월복리</option><option value="ANNUAL">연복리</option></select>
+                        </div>
+                    </div>
+                    <button id="saveAccBtn" class="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-3 px-4 rounded-md mb-6">계좌 정보 저장/업데이트</button>
+                    <div class="flex justify-between items-center mb-3"><h3 class="text-lg font-bold text-gray-800">보유 현금 자산</h3>
+                        <button id="loadAccBtn" class="text-sm bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-1 px-3 rounded">목록 새로고침</button></div>
+                    <div class="overflow-x-auto"><table class="w-full text-left border-collapse">
+                        <thead><tr class="bg-gray-100 text-gray-700 text-sm"><th class="p-3 border-b">종류</th><th class="p-3 border-b">계좌명</th><th class="p-3 border-b text-right">잔고</th><th class="p-3 border-b text-right">원화 환산</th><th class="p-3 border-b text-right">연이율</th></tr></thead>
+                        <tbody id="accountBody" class="text-sm"><tr><td colspan="5" class="p-4 text-center text-gray-500">계좌를 불러와주세요.</td></tr></tbody>
+                    </table></div>
+                </div>
+                <div id="totalViewPanel" class="hidden mt-6 border-t border-gray-200 pt-6">
+                    <section aria-labelledby="totalStockHeading">
+                        <div class="flex justify-between items-center mb-2">
+                            <h3 id="totalStockHeading" class="text-lg font-bold text-gray-800">현재 보유 주식</h3>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="portfolio-table w-full text-left border-collapse">
+                                <thead><tr class="bg-gray-100 text-gray-700 text-xs">
+                                    <th class="p-2 border-b">종목</th><th class="p-2 border-b text-right">수량</th>
+                                    <th class="p-2 border-b text-right">투자금</th><th class="p-2 border-b text-right">평가금액</th><th class="p-2 border-b text-right">전일대비</th>
+                                </tr></thead>
+                                <tbody id="totalPortfolioBody" class="text-xs">
+                                    <tr><td colspan="5" class="p-4 text-center text-gray-500">포트폴리오를 불러와주세요.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                    <section class="mt-8 border-t border-gray-200 pt-6" aria-labelledby="totalCashHeading">
+                        <h3 id="totalCashHeading" class="text-xl font-extrabold text-gray-900 mb-5">🏦 현금자산</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead><tr class="bg-gray-100 text-gray-700 text-sm">
+                                    <th class="p-3 border-b">종류</th><th class="p-3 border-b">계좌명</th>
+                                    <th class="p-3 border-b text-right">잔고</th><th class="p-3 border-b text-right">원화 환산</th><th class="p-3 border-b text-right">연이율</th>
+                                </tr></thead>
+                                <tbody id="totalAccountBody" class="text-sm">
+                                    <tr><td colspan="5" class="p-4 text-center text-gray-500">계좌를 불러와주세요.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </section>
+
+        <section id="compoundSection" role="tabpanel" aria-labelledby="compoundTab" class="hidden">
+            <div class="bg-white p-8 rounded-xl shadow-lg border border-gray-100">
+                <h2 class="text-2xl font-extrabold text-gray-900 mb-2 border-b pb-4">📊 복리계산기</h2>
+                <p class="text-sm text-gray-500 mb-6">현금자산 계좌를 선택하고 기간과 추가납입 정보를 입력하면 월별 복리 자산 변화를 계산합니다.</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div><label for="compoundAccount" class="block text-xs font-semibold text-gray-700 mb-1">계좌</label><select id="compoundAccount" class="w-full h-10 px-3 py-2 border border-gray-300 rounded-md"><option value="">계좌를 선택하세요</option></select></div>
+                    <div><label for="compoundRate" class="block text-xs font-semibold text-gray-700 mb-1">연이율 (%)</label><input id="compoundRate" type="number" min="0" step="0.01" class="w-full h-10 px-3 py-2 border border-gray-300 rounded-md"></div>
+                    <div><label for="compoundType" class="block text-xs font-semibold text-gray-700 mb-1">복리 방식</label><select id="compoundType" class="w-full h-10 px-3 py-2 border border-gray-300 rounded-md"><option value="MONTHLY">월복리</option><option value="ANNUAL">연복리</option></select></div>
+                    <div><label for="compoundYears" class="block text-xs font-semibold text-gray-700 mb-1">계산 기간 (년)</label><input id="compoundYears" type="number" value="10" min="1" max="100" step="1" class="w-full h-10 px-3 py-2 border border-gray-300 rounded-md"></div>
+                </div>
+                <div class="mb-6 rounded-lg border border-indigo-100 bg-indigo-50 p-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-bold text-indigo-900">추가납입</h3>
+                        <button id="addCompoundPaymentBtn" type="button" class="h-9 px-3 rounded-md bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold">+ 추가납입 추가</button>
+                    </div>
+                    <div id="compoundPayments" class="space-y-3"></div>
+                    <p class="mt-2 text-xs text-indigo-700">납입 시점은 계산 시작 후 몇 개월 뒤인지 입력하세요.</p>
+                </div>
+                <div class="flex justify-end mb-6">
+                    <button id="compoundCalculateBtn" class="w-full sm:w-auto min-w-40 h-10 bg-indigo-600 hover:bg-indigo-700 text-white font-bold px-6 rounded-md">10년 계산</button>
+                </div>
+                <div class="mb-6 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                    <h3 class="text-sm font-bold text-gray-800 mb-3">복리 프리셋</h3>
+                    <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 mb-3">
+                        <input id="compoundPresetName" type="text" maxlength="100" placeholder="프리셋 이름 (예: 매월 20만원 납입)" class="w-full h-10 px-3 py-2 border border-gray-300 rounded-md">
+                        <button id="saveCompoundPresetBtn" type="button" class="h-10 px-4 rounded-md bg-gray-700 hover:bg-gray-800 text-white font-semibold">현재 설정 저장</button>
+                    </div>
+                    <div class="flex gap-2">
+                        <select id="compoundPresetSelect" class="min-w-0 flex-1 h-10 px-3 py-2 border border-gray-300 rounded-md"><option value="">저장된 프리셋 선택</option></select>
+                        <button id="loadCompoundPresetBtn" type="button" class="h-10 px-4 rounded-md border border-indigo-200 text-indigo-700 hover:bg-indigo-50">불러오기</button>
+                        <button id="deleteCompoundPresetBtn" type="button" class="h-10 px-4 rounded-md border border-red-200 text-red-600 hover:bg-red-50">삭제</button>
+                    </div>
+                </div>
+                <p id="compoundSummary" class="mb-4 text-sm text-gray-700"></p>
+                <div class="h-96"><canvas id="compoundChart" aria-label="월별 복리 자산 그래프"></canvas></div>
+            </div>
+        </section>
+
+        <section id="trackerSection" role="tabpanel" aria-labelledby="trackerTab" class="hidden">
+            <div class="bg-white p-8 rounded-xl shadow-lg border border-gray-100">
+                <h2 class="text-2xl font-extrabold text-gray-900 mb-6 border-b pb-4">📈 거래 타임라인 트래커</h2>
+                <div class="space-y-5 mb-8">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-1">종목 티커</label>
+                        <input type="text" id="ticker" value="PLTR" class="w-full px-4 py-2 border border-gray-300 rounded-md uppercase">
+                    </div>
+                    <div class="bg-indigo-50 p-4 rounded-lg border border-indigo-100">
+                        <p class="text-sm font-semibold text-indigo-800 mb-2">AI 거래 영수증·스크린샷 자동 등록</p>
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <label for="screenshotInput" class="sr-only">거래 스크린샷</label>
+                            <input type="file" accept="image/*" id="screenshotInput" class="min-w-0 flex-1 px-3 py-2 bg-white border border-gray-300 rounded-md text-sm">
+                            <button id="analyzeScreenshotBtn" type="button" class="bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2 px-4 rounded-md whitespace-nowrap">AI 이미지 분석 및 자동 등록</button>
+                        </div>
+                        <p id="screenshotStatus" class="mt-2 text-xs text-indigo-700" aria-live="polite">Toss Securities 거래 화면 이미지를 업로드하면 매수·매도 내역을 자동 등록합니다.</p>
+                    </div>
+                    <div class="bg-red-50 p-4 rounded-lg border border-red-100">
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-sm font-semibold text-red-800">매수 내역</p>
+                            <button id="addBuyEntryBtn" type="button" class="px-3 py-1 rounded bg-red-600 hover:bg-red-700 text-white text-xs font-semibold">+ 매수 내역 추가</button>
+                        </div>
+                        <div id="buyEntries" class="space-y-2"></div>
+                        <p class="mt-2 text-xs text-red-700">매수일·매수가·수량별로 그래프에 빨간 점이 표시됩니다.</p>
+                        <div class="mt-4 border-t border-red-200 pt-3">
+                            <p class="text-sm font-semibold text-red-800 mb-2">매수 프리셋</p>
+                            <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 mb-2">
+                                <input id="buyPresetName" type="text" maxlength="100" placeholder="프리셋 이름 (예: PLTR 분할매수)" class="w-full px-3 py-2 border border-gray-300 rounded-md">
+                                <button id="saveBuyPresetBtn" type="button" class="px-4 py-2 rounded-md bg-red-600 hover:bg-red-700 text-white text-sm font-semibold">현재 매수 내역 저장</button>
+                            </div>
+                            <div class="flex flex-col sm:flex-row gap-2">
+                                <select id="buyPresetSelect" class="min-w-0 flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm">
+                                    <option value="">저장된 매수 프리셋 선택</option>
+                                </select>
+                                <button id="loadBuyPresetBtn" type="button" class="px-3 py-2 rounded-md border border-red-200 text-red-700 hover:bg-red-100 text-sm">불러오기</button>
+                                <button id="deleteBuyPresetBtn" type="button" class="px-3 py-2 rounded-md border border-red-200 text-red-600 hover:bg-red-100 text-sm">삭제</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="text-sm font-semibold text-blue-800">매도 내역</p>
+                            <button id="addSellEntryBtn" type="button" class="px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold">+ 매도 내역 추가</button>
+                        </div>
+                        <div id="sellEntries" class="space-y-2"></div>
+                        <p class="mt-2 text-xs text-blue-700">매도일·매도가·수량별로 그래프에 파란 점이 표시됩니다.</p>
+                        <div class="flex justify-end mt-3"><button id="saveBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-md">DB 저장</button></div>
+                    </div>
+                    <div class="flex gap-3 pt-2">
+                        <button id="loadBtn" class="flex-1 bg-gray-800 hover:bg-gray-900 text-white font-bold py-3 px-4 rounded-md">매도 기록 불러오기</button>
+                        <button id="calcBtn" class="flex-1 bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-md">현재가 연동 및 분석</button>
+                    </div>
+                </div>
+                <div id="result" class="mt-4 hidden">
+                    <div class="p-5 bg-gray-50 rounded-lg border border-gray-200">
+                        <div id="resultContent" class="text-gray-700 space-y-2"></div>
+                        <div class="mt-6 flex justify-end gap-2">
+                            <button id="zoomInBtn" type="button" class="px-3 py-1 text-xs rounded border border-gray-300 hover:bg-gray-100">확대</button>
+                            <button id="zoomOutBtn" type="button" class="px-3 py-1 text-xs rounded border border-gray-300 hover:bg-gray-100">축소</button>
+                            <button id="resetZoomBtn" type="button" class="px-3 py-1 text-xs rounded border border-gray-300 hover:bg-gray-100">전체 보기</button>
+                        </div>
+                        <div class="mt-2 h-64"><canvas id="priceComparisonChart" aria-label="최근 3개월 가격 추이 차트"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="opportunitySection" role="tabpanel" aria-labelledby="opportunityTab" class="hidden">
+            <div class="bg-white p-8 rounded-xl shadow-lg border border-orange-100">
+                <h2 class="text-2xl font-extrabold text-gray-900 mb-2 border-b pb-4">💰 매도 기회비용 시뮬레이터</h2>
+                <p class="text-sm text-gray-500 mb-6">실제 거래 기록과 분리하여, 특정 가격에 매도했다면 현재 얼마의 기회비용 또는 추가 이익이 발생했는지 계산합니다.</p>
+                <div class="space-y-5">
+                    <div>
+                        <label for="opportunityTicker" class="block text-sm font-semibold text-gray-700 mb-1">종목 티커</label>
+                        <input type="text" id="opportunityTicker" value="PLTR" class="w-full px-4 py-2 border border-gray-300 rounded-md uppercase">
+                    </div>
+                    <div class="bg-orange-50 p-4 rounded-lg border border-orange-100">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label for="opportunitySellPrice" class="block text-sm font-semibold text-orange-800 mb-1">가정 매도가 ($)</label>
+                                <input type="number" id="opportunitySellPrice" step="0.01" min="0.01" placeholder="예: 177.79" class="w-full px-4 py-2 border border-gray-300 rounded-md">
+                            </div>
+                            <div>
+                                <label for="opportunitySellQty" class="block text-sm font-semibold text-orange-800 mb-1">매도 수량</label>
+                                <input type="number" id="opportunitySellQty" value="100" min="1" step="1" class="w-full px-4 py-2 border border-gray-300 rounded-md">
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <button id="loadOpportunityHistoryBtn" type="button" class="bg-gray-800 hover:bg-gray-900 text-white font-bold py-3 px-4 rounded-md">저장된 매도 기록 불러오기</button>
+                        <button id="opportunityBtn" class="bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-md">현재가와 비교하기</button>
+                    </div>
+                    <div id="opportunityResult" class="hidden rounded-lg border border-gray-200 bg-gray-50 p-5"></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="simulationSection" role="tabpanel" aria-labelledby="simulationTab" class="hidden">
+            <div class="bg-white p-8 rounded-xl shadow-lg border border-gray-100">
+                <h2 class="text-2xl font-extrabold text-gray-900 mb-2 border-b pb-4">🛒 매수 시뮬레이션</h2>
+                <p class="text-sm text-gray-500 mb-6">목표 매수가로 매수했다면 현재 얼마의 수익 또는 손실인지 계산합니다.</p>
+                <div class="space-y-5 mb-8">
+                    <div>
+                        <label for="simulationTicker" class="block text-sm font-semibold text-gray-700 mb-1">종목 티커</label>
+                        <input type="text" id="simulationTicker" value="PLTR" class="w-full px-4 py-2 border border-gray-300 rounded-md uppercase">
+                    </div>
+                    <div class="bg-purple-50 p-4 rounded-lg border border-purple-100">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div><label for="targetBuyPrice" class="block text-sm font-semibold text-purple-800 mb-1">목표 매수가 ($)</label>
+                                <input type="number" id="targetBuyPrice" placeholder="가정할 매수가 입력" step="0.01" min="0.01" class="w-full px-4 py-2 border border-gray-300 rounded-md"></div>
+                            <div><label for="buyQty" class="block text-sm font-semibold text-purple-800 mb-1">매수 수량</label>
+                                <input type="number" id="buyQty" value="100" min="1" step="1" class="w-full px-4 py-2 border border-gray-300 rounded-md"></div>
+                        </div>
+                    </div>
+                    <button id="simulationBtn" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-md">현재가 기준 매수 시뮬레이션</button>
+                </div>
+                <div id="simulationResult" class="hidden rounded-lg border border-gray-200 bg-gray-50 p-5"></div>
+            </div>
+        </section>
+
+        <section id="patchNotesSection" role="tabpanel" aria-labelledby="patchNotesTab" class="hidden">
+            <div class="bg-white p-8 rounded-xl shadow-lg border border-gray-100">
+                <h2 class="text-2xl font-extrabold text-gray-900 mb-2 border-b pb-4">📝 패치노트</h2>
+                <p class="text-sm text-gray-500 mb-6">CATCHER의 주요 업데이트를 간략하게 확인할 수 있습니다.</p>
+                <div class="mb-6 rounded-lg border border-violet-200 bg-violet-50 p-5">
+                    <div class="flex items-center gap-2 mb-2">
+                        <h3 class="text-lg font-bold text-violet-900">🧭 향후 개발 방향</h3>
+                        <span title="앞으로 추가할 기능과 개발 우선순위를 정리한 영역입니다." class="cursor-help text-violet-500" aria-label="향후 개발 방향 안내">ⓘ</span>
+                    </div>
+                    <p class="text-sm text-violet-800 mb-4">사용자 의견을 반영해 추가할 기능을 순서대로 기록합니다.</p>
+                    <div id="roadmapList" class="space-y-3"></div>
+                </div>
+                <div id="patchNotesList" class="space-y-4"></div>
+            </div>
+        </section>
+
+        </div>
+
+        <aside class="bg-white p-5 rounded-xl shadow-lg border border-gray-100 lg:sticky lg:top-24">
+            <div class="flex items-start justify-between gap-3 mb-3">
+                <div>
+                    <h2 class="text-lg font-extrabold text-gray-900">내 관심종목</h2>
+                    <p class="text-xs text-gray-500">원하는 티커를 직접 추가하세요</p>
+                </div>
+                <button id="refreshWatchlist" type="button"
+                    class="shrink-0 text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-2 py-1 rounded">
+                    새로고침
+                </button>
+            </div>
+            <form id="watchlistForm" class="flex gap-2 mb-3">
+                <label for="watchlistTicker" class="sr-only">관심종목 티커</label>
+                <input id="watchlistTicker" type="text" placeholder="예: AAPL"
+                    maxlength="10" autocomplete="off"
+                    class="min-w-0 flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm uppercase focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <button type="submit" class="shrink-0 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-3 py-2 rounded-md">
+                    추가
+                </button>
+            </form>
+            <p id="watchlistMessage" class="hidden mb-2 text-xs text-red-500"></p>
+            <ul id="watchlist" class="divide-y divide-gray-100" aria-live="polite">
+                <li class="py-4 text-center text-sm text-gray-500">실시간 가격 불러오는 중...</li>
+            </ul>
+            <p id="watchlistUpdatedAt" class="mt-3 text-[11px] text-gray-400">업데이트 대기 중</p>
+        </aside>
+        </div>
+    </main>
+
+    <script type="module">
+        import { loadInitialPortfolio } from './js/portfolio.js';
+        import { loadInitialAccounts } from './js/accounts.js';
+        import './js/tracker.js';
+        import './js/nasdaq-top10.js';
+        import './js/compound.js';
+        import './js/patch-notes.js';
+
+        const tabConfig = {
+            portfolio: { section: 'portfolioSection', button: 'portfolioTab' },
+            tracker: { section: 'trackerSection', button: 'trackerTab' },
+            simulation: { section: 'simulationSection', button: 'simulationTab' },
+            opportunity: { section: 'opportunitySection', button: 'opportunityTab' },
+            compound: { section: 'compoundSection', button: 'compoundTab' },
+            patchNotes: { section: 'patchNotesSection', button: 'patchNotesTab' },
+        };
+
+        function switchTab(tabName) {
+            const selectedTab = tabConfig[tabName];
+            if (!selectedTab) {
+                throw new Error(`알 수 없는 탭입니다: ${tabName}`);
+            }
+
+            Object.values(tabConfig).forEach(({ section, button }) => {
+                document.getElementById(section).classList.add('hidden');
+                const tabButton = document.getElementById(button);
+                tabButton.classList.remove('bg-indigo-600', 'text-white');
+                tabButton.classList.add('text-gray-600');
+                tabButton.setAttribute('aria-selected', 'false');
+            });
+
+            document.getElementById(selectedTab.section).classList.remove('hidden');
+            const activeButton = document.getElementById(selectedTab.button);
+            activeButton.classList.remove('text-gray-600');
+            activeButton.classList.add('bg-indigo-600', 'text-white');
+            activeButton.setAttribute('aria-selected', 'true');
+        }
+
+        window.switchTab = switchTab;
+
+        function switchPortfolioView(viewName) {
+            const panels = {
+                stock: document.getElementById('stockViewPanel'),
+                cash: document.getElementById('cashViewPanel'),
+                total: document.getElementById('totalViewPanel')
+            };
+            const buttons = {
+                stock: document.getElementById('stockViewBtn'),
+                cash: document.getElementById('cashViewBtn'),
+                total: document.getElementById('totalViewBtn')
+            };
+
+            Object.values(panels).forEach((panel) => panel.classList.add('hidden'));
+            Object.values(buttons).forEach((button) => {
+                button.classList.remove('bg-indigo-600', 'bg-teal-600', 'bg-purple-600', 'text-white', 'shadow-sm');
+                button.classList.add('text-gray-600');
+            });
+
+            if (viewName === 'stock') {
+                panels.stock.classList.remove('hidden');
+                buttons.stock.classList.remove('text-gray-600');
+                buttons.stock.classList.add('bg-indigo-600', 'text-white', 'shadow-sm');
+            } else if (viewName === 'cash') {
+                panels.cash.classList.remove('hidden');
+                buttons.cash.classList.remove('text-gray-600');
+                buttons.cash.classList.add('bg-teal-600', 'text-white', 'shadow-sm');
+            } else if (viewName === 'total') {
+                panels.total.classList.remove('hidden');
+                buttons.total.classList.remove('text-gray-600');
+                buttons.total.classList.add('bg-purple-600', 'text-white', 'shadow-sm');
+            } else {
+                throw new Error(`알 수 없는 포트폴리오 화면입니다: ${viewName}`);
+            }
+        }
+
+        window.switchPortfolioView = switchPortfolioView;
+
+        window.addEventListener('DOMContentLoaded', () => {
+            loadInitialPortfolio();
+            loadInitialAccounts();
+            window.switchTab('portfolio');
+            window.switchPortfolioView('stock');
+        });
+    </script>
+</body>
+</html>

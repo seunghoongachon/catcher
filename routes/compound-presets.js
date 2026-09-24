@@ -7,14 +7,17 @@ const ensureTable = async (conn) => {
     await conn.query(`
         CREATE TABLE IF NOT EXISTS compound_presets (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            preset_name VARCHAR(100) NOT NULL UNIQUE,
+            user_id INT NOT NULL,
+            preset_name VARCHAR(100) NOT NULL,
             account_id INT NULL,
             interest_rate DECIMAL(10, 4) NOT NULL DEFAULT 0,
             compounding_type ENUM('ANNUAL', 'MONTHLY') NOT NULL DEFAULT 'MONTHLY',
             years INT NOT NULL DEFAULT 10,
             payments TEXT NOT NULL,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_compound_presets_user_name (user_id, preset_name),
+            INDEX idx_compound_presets_user_id (user_id)
         )
     `);
 };
@@ -24,7 +27,7 @@ router.get('/', async (req, res) => {
     try {
         conn = await pool.getConnection();
         await ensureTable(conn);
-        const rows = await conn.query('SELECT * FROM compound_presets ORDER BY updated_at DESC');
+        const rows = await conn.query('SELECT * FROM compound_presets WHERE user_id = ? ORDER BY updated_at DESC', [req.user.id]);
         res.json(rows.map((row) => ({
             ...row,
             payments: JSON.parse(row.payments || '[]')
@@ -60,17 +63,27 @@ router.post('/', async (req, res) => {
         }
         conn = await pool.getConnection();
         await ensureTable(conn);
+        const normalizedAccountId = accountId ? Number(accountId) : null;
+        if (normalizedAccountId !== null) {
+            const accountRows = await conn.query(
+                'SELECT id FROM bank_accounts WHERE id = ? AND user_id = ?',
+                [normalizedAccountId, req.user.id]
+            );
+            if (accountRows.length === 0) {
+                return res.status(400).json({ error: '선택한 계좌를 찾을 수 없습니다.' });
+            }
+        }
         await conn.query(`
             INSERT INTO compound_presets
-                (preset_name, account_id, interest_rate, compounding_type, years, payments)
-            VALUES (?, ?, ?, ?, ?, ?)
+                (user_id, preset_name, account_id, interest_rate, compounding_type, years, payments)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 account_id = VALUES(account_id),
                 interest_rate = VALUES(interest_rate),
                 compounding_type = VALUES(compounding_type),
                 years = VALUES(years),
                 payments = VALUES(payments)
-        `, [presetName.trim(), accountId ? Number(accountId) : null, numericRate, compoundingType, numericYears, JSON.stringify(normalizedPayments)]);
+        `, [req.user.id, presetName.trim(), normalizedAccountId, numericRate, compoundingType, numericYears, JSON.stringify(normalizedPayments)]);
         res.status(201).json({ message: '복리 프리셋이 저장되었습니다.' });
     } catch (error) {
         console.error('복리 프리셋 저장 에러:', error);
@@ -85,7 +98,7 @@ router.delete('/:id', async (req, res) => {
     try {
         conn = await pool.getConnection();
         await ensureTable(conn);
-        await conn.query('DELETE FROM compound_presets WHERE id = ?', [Number(req.params.id)]);
+        await conn.query('DELETE FROM compound_presets WHERE user_id = ? AND id = ?', [req.user.id, Number(req.params.id)]);
         res.json({ message: '복리 프리셋이 삭제되었습니다.' });
     } catch (error) {
         console.error('복리 프리셋 삭제 에러:', error);

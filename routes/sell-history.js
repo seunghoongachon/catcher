@@ -22,8 +22,8 @@ router.post('/', async (req, res) => {
         await ensureSellQuantityColumn(conn);
         const normalizedTicker = await normalizeTicker(ticker, yahooFinance);
         await conn.query(
-            'INSERT INTO sell_history (ticker, sell_price, sell_quantity, sell_date) VALUES (?, ?, ?, ?)',
-            [normalizedTicker, Number(sellPrice), Number(sellQty) || 0, sellDate || new Date()]
+            'INSERT INTO sell_history (user_id, ticker, sell_price, sell_quantity, sell_date) VALUES (?, ?, ?, ?, ?)',
+            [req.user.id, normalizedTicker, Number(sellPrice), Number(sellQty) || 0, sellDate || new Date()]
         );
         res.status(201).json({ message: '매도 기록이 성공적으로 저장되었습니다.' });
     } catch (error) {
@@ -42,8 +42,8 @@ router.get('/:ticker', async (req, res) => {
         await ensureSellQuantityColumn(conn);
         const ticker = await normalizeTicker(req.params.ticker, yahooFinance);
         const rows = await conn.query(
-            'SELECT * FROM sell_history WHERE ticker = ? ORDER BY sell_date DESC, id DESC',
-            [ticker]
+            'SELECT * FROM sell_history WHERE user_id = ? AND ticker = ? ORDER BY sell_date DESC, id DESC',
+            [req.user.id, ticker]
         );
         res.json(rows);
     } catch (error) {

@@ -51,8 +51,8 @@ router.post('/', async (req, res) => {
         const balanceKrw = numericBalance * usdKrwRate;
         await conn.query(
             `INSERT INTO bank_accounts
-                (account_name, account_type, balance, original_balance, currency, interest_rate)
-             VALUES (?, ?, ?, ?, ?, ?)
+                (user_id, account_name, account_type, balance, original_balance, currency, interest_rate, compounding_type)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                 account_type = VALUES(account_type),
                 balance = VALUES(balance),
@@ -60,7 +60,7 @@ router.post('/', async (req, res) => {
                 currency = VALUES(currency),
                 interest_rate = VALUES(interest_rate),
                 compounding_type = VALUES(compounding_type)`,
-            [accountName, accountType, balanceKrw, numericBalance, currency, Number(interestRate) || 0, compoundingType]
+            [req.user.id, accountName, accountType, balanceKrw, numericBalance, currency, Number(interestRate) || 0, compoundingType]
         );
         res.status(201).json({ message: '계좌 정보가 업데이트되었습니다.', exchangeRate: usdKrwRate });
     } catch (error) {
@@ -78,7 +78,8 @@ router.get('/', async (req, res) => {
         conn = await pool.getConnection();
         await ensureAccountColumns(conn);
         const rows = await conn.query(
-            'SELECT * FROM bank_accounts ORDER BY updated_at DESC'
+            'SELECT * FROM bank_accounts WHERE user_id = ? ORDER BY updated_at DESC',
+            [req.user.id]
         );
         res.json(rows);
     } catch (error) {

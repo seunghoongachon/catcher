@@ -7,11 +7,14 @@ const ensureTable = async (conn) => {
     await conn.query(`
         CREATE TABLE IF NOT EXISTS buy_presets (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            preset_name VARCHAR(100) NOT NULL UNIQUE,
+            user_id INT NOT NULL,
+            preset_name VARCHAR(100) NOT NULL,
             ticker VARCHAR(32) NOT NULL,
             buy_entries TEXT NOT NULL,
             created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            UNIQUE KEY uq_buy_presets_user_name (user_id, preset_name),
+            INDEX idx_buy_presets_user_id (user_id)
         )
     `);
 };
@@ -38,7 +41,7 @@ router.get('/', async (req, res) => {
     try {
         conn = await pool.getConnection();
         await ensureTable(conn);
-        const rows = await conn.query('SELECT * FROM buy_presets ORDER BY updated_at DESC');
+        const rows = await conn.query('SELECT * FROM buy_presets WHERE user_id = ? ORDER BY updated_at DESC', [req.user.id]);
         res.json(rows.map((row) => ({
             ...row,
             buy_entries: JSON.parse(row.buy_entries || '[]')
@@ -64,12 +67,12 @@ router.post('/', async (req, res) => {
         conn = await pool.getConnection();
         await ensureTable(conn);
         await conn.query(`
-            INSERT INTO buy_presets (preset_name, ticker, buy_entries)
-            VALUES (?, ?, ?)
+            INSERT INTO buy_presets (user_id, preset_name, ticker, buy_entries)
+            VALUES (?, ?, ?, ?)
             ON DUPLICATE KEY UPDATE
                 ticker = VALUES(ticker),
                 buy_entries = VALUES(buy_entries)
-        `, [name, normalizedTicker, JSON.stringify(normalizedEntries)]);
+        `, [req.user.id, name, normalizedTicker, JSON.stringify(normalizedEntries)]);
         res.status(201).json({ message: '매수 프리셋이 저장되었습니다.' });
     } catch (error) {
         console.error('매수 프리셋 저장 에러:', error);
@@ -84,7 +87,7 @@ router.delete('/:id', async (req, res) => {
     try {
         conn = await pool.getConnection();
         await ensureTable(conn);
-        await conn.query('DELETE FROM buy_presets WHERE id = ?', [Number(req.params.id)]);
+        await conn.query('DELETE FROM buy_presets WHERE user_id = ? AND id = ?', [req.user.id, Number(req.params.id)]);
         res.json({ message: '매수 프리셋이 삭제되었습니다.' });
     } catch (error) {
         console.error('매수 프리셋 삭제 에러:', error);

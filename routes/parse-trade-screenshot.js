@@ -135,8 +135,8 @@ router.post('/', uploadScreenshot, async (req, res) => {
         for (const trade of trades) {
             const normalizedTicker = await normalizeTicker(trade.ticker, yahooFinance);
             await conn.query(
-                'INSERT INTO trade_history (ticker, trade_type, trade_date, price, quantity) VALUES (?, ?, ?, ?, ?)',
-                [normalizedTicker, trade.tradeType, trade.tradeDate, trade.price, trade.quantity]
+                'INSERT INTO trade_history (user_id, ticker, trade_type, trade_date, price, quantity) VALUES (?, ?, ?, ?, ?, ?)',
+                [req.user.id, normalizedTicker, trade.tradeType, trade.tradeDate, trade.price, trade.quantity]
             );
             if (trade.tradeType === 'SELL') {
                 await conn.query(`
@@ -144,8 +144,8 @@ router.post('/', uploadScreenshot, async (req, res) => {
                     ADD COLUMN IF NOT EXISTS sell_quantity DECIMAL(20, 4) NOT NULL DEFAULT 0
                 `);
                 await conn.query(
-                    'INSERT INTO sell_history (ticker, sell_price, sell_quantity, sell_date) VALUES (?, ?, ?, ?)',
-                    [normalizedTicker, trade.price, trade.quantity, trade.tradeDate]
+                    'INSERT INTO sell_history (user_id, ticker, sell_price, sell_quantity, sell_date) VALUES (?, ?, ?, ?, ?)',
+                    [req.user.id, normalizedTicker, trade.price, trade.quantity, trade.tradeDate]
                 );
             }
             savedTrades.push({ ...trade, ticker: normalizedTicker });

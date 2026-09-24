@@ -14,12 +14,12 @@ router.post('/', async (req, res) => {
         conn = await pool.getConnection();
         const normalizedTicker = await normalizeTicker(ticker, yahooFinance);
         await conn.query(
-            `INSERT INTO portfolio (ticker, avg_price, quantity)
-             VALUES (?, ?, ?)
+            `INSERT INTO portfolio (user_id, ticker, avg_price, quantity)
+             VALUES (?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE
                 avg_price = VALUES(avg_price),
                 quantity = VALUES(quantity)`,
-            [normalizedTicker, avgPrice, quantity]
+            [req.user.id, normalizedTicker, avgPrice, quantity]
         );
         res.status(201).json({ message: '포트폴리오가 업데이트되었습니다.', ticker: normalizedTicker });
     } catch (error) {
@@ -36,7 +36,8 @@ router.get('/', async (req, res) => {
     try {
         conn = await pool.getConnection();
         const rows = await conn.query(
-            'SELECT * FROM portfolio ORDER BY updated_at DESC'
+            'SELECT * FROM portfolio WHERE user_id = ? ORDER BY updated_at DESC',
+            [req.user.id]
         );
         res.json(rows);
     } catch (error) {

@@ -103,6 +103,11 @@
         <div class="max-w-7xl mx-auto px-6">
             <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-4">
                 <h1 class="text-xl font-extrabold text-gray-900">🐱 CATCHER</h1>
+                <div class="flex items-center gap-2 text-sm">
+                    <span id="loggedInUser" class="font-semibold text-gray-600"></span>
+                    <button id="logoutButton" type="button"
+                        class="px-3 py-2 rounded-md text-gray-600 hover:bg-gray-100 font-semibold">로그아웃</button>
+                </div>
                 <div class="no-scrollbar flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="주요 기능">
                     <button id="portfolioTab" role="tab" aria-controls="portfolioSection" aria-selected="true"
                         class="tab-button whitespace-nowrap px-4 py-2 rounded-md bg-indigo-600 text-white font-semibold transition"
@@ -481,6 +486,16 @@
         import './js/nasdaq-top10.js';
         import './js/compound.js';
         import './js/patch-notes.js';
+
+        const currentUserResponse = await fetch('/api/auth/me');
+        const currentUserData = await currentUserResponse.json();
+        document.getElementById('loggedInUser').textContent = currentUserData.user
+            ? `${currentUserData.user.username}님`
+            : '';
+        document.getElementById('logoutButton').addEventListener('click', async () => {
+            await fetch('/api/auth/logout', { method: 'POST' });
+            window.location.href = '/login.html';
+        });
 
         const tabConfig = {
             portfolio: { section: 'portfolioSection', button: 'portfolioTab' },
